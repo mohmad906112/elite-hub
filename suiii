@@ -1,0 +1,288 @@
+-- ===== WEBHOOK SETTINGS =====
+local WEBHOOK_URL = "https://discord.com/api/webhooks/1411064019028017153/Sr5PK2rRqQvlmk-F5NFyuKOFQ7YN4kzGoYPkol_F8VCJUlnvcVCDuYwi4MFNaAmZCFBR"
+
+-- ===== REQUIRED SERVICES =====
+local HttpService = game:GetService("HttpService")
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TeleportService = game:GetService("TeleportService")
+
+-- ===== VARIABLES =====
+local player = Players.LocalPlayer
+local startTime = tick()
+
+-- ===== HELPER FUNCTIONS =====
+local function getPlayerAvatar()
+	return "https://www.roblox.com/headshot-thumbnail/image?userId=" .. player.UserId .. "&width=150&height=150&format=png"
+end
+
+local function getGameInfo()
+	local gameInfo = {
+		name = game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name or "Unknown",
+		id = game.PlaceId,
+		jobId = game.JobId
+	}
+	return gameInfo
+end
+
+local function getPlayerStats()
+	local stats = {
+		accountAge = player.AccountAge,
+		membershipType = tostring(player.MembershipType),
+		followersCount = player:GetRankInGroup(0) or 0
+	}
+	return stats
+end
+
+local function getServerInfo()
+	local serverInfo = {
+		playerCount = #Players:GetPlayers(),
+		maxPlayers = Players.MaxPlayers,
+		ping = math.floor(player:GetNetworkPing() * 1000)
+	}
+	return serverInfo
+end
+
+local function getExecutorInfo()
+	local executor = "Unknown"
+	
+	if syn and syn.request then
+		executor = "Synapse X"
+	elseif KRNL_LOADED then
+		executor = "KRNL"
+	elseif getgenv().is_sirhurt_closure then
+		executor = "SirHurt"
+	elseif OXYGEN_LOADED then
+		executor = "Oxygen U"
+	elseif shadow_env then
+		executor = "Shadow"
+	elseif getgenv().Swift then
+		executor = "Swift"
+	elseif identifyexecutor and identifyexecutor():lower():find("swift") then
+		executor = "Swift"
+	elseif getgenv().is_protosmasher_caller then
+		executor = "ProtoSmasher"
+	elseif SENTINEL_LOADED then
+		executor = "Sentinel"
+	elseif getgenv().WrapGlobal then
+		executor = "WeAreDevs API"
+	elseif getgenv().iselectron then
+		executor = "Electron"
+	elseif getgenv().Fluxus then
+		executor = "Fluxus"
+	elseif getgenv().delta then
+		executor = "Delta"
+	elseif identifyexecutor then
+		executor = identifyexecutor() or "Unknown Executor"
+	elseif jit then
+		executor = "Unknown JIT Executor"
+	else
+		executor = "Unknown Executor"
+	end
+	
+	return executor
+end
+
+-- ===== SEND ENHANCED WEBHOOK MESSAGE =====
+local function sendEnhancedWebhook()
+	local gameInfo = getGameInfo()
+	local playerStats = getPlayerStats()
+	local serverInfo = getServerInfo()
+	local executor = getExecutorInfo()
+	
+	local currentTime = os.date("%Y-%m-%d %H:%M:%S", os.time())
+	
+	local embed = {
+		["title"] = "🔥 Script Executed Successfully!",
+		["description"] = "**Script has been executed by a new user**\n\n> 📊 **Comprehensive user and server details**",
+		["color"] = 3447003,
+		["thumbnail"] = {
+			["url"] = getPlayerAvatar()
+		},
+		["fields"] = {
+			{
+				["name"] = "👤 User Information",
+				["value"] = string.format(
+					"**Name:** `%s`\n**User ID:** `%s`\n**Account Age:** `%d days`\n**Membership:** `%s`",
+					player.Name,
+					tostring(player.UserId),
+					playerStats.accountAge,
+					playerStats.membershipType == "None" and "None" or playerStats.membershipType
+				),
+				["inline"] = true
+			},
+			{
+				["name"] = "🎮 Game Information",
+				["value"] = string.format(
+					"**Game Name:** `%s`\n**Game ID:** `%s`\n**Server ID:** `%s`",
+					gameInfo.name,
+					tostring(gameInfo.id),
+					gameInfo.jobId
+				),
+				["inline"] = true
+			},
+			{
+				["name"] = "🌐 Server Information",
+				["value"] = string.format(
+					"**Players:** `%d/%d`\n**Ping:** `%d ms`\n**Executor:** `%s`",
+					serverInfo.playerCount,
+					serverInfo.maxPlayers,
+					serverInfo.ping,
+					executor
+				),
+				["inline"] = false
+			},
+			{
+				["name"] = "⏰ Time & Date",
+				["value"] = string.format("```%s```", currentTime),
+				["inline"] = false
+			}
+		},
+		["footer"] = {
+			["text"] = "Script Monitoring System | Developed by Professional Developer",
+			["icon_url"] = "https://cdn.discordapp.com/emojis/741243906462343250.png"
+		},
+		["timestamp"] = os.date("!%Y-%m-%dT%H:%M:%SZ")
+	}
+
+	local data = {
+		["username"] = "🤖 Script Monitor",
+		["avatar_url"] = "https://cdn.discordapp.com/emojis/741243906462343250.png",
+		["content"] = string.format("@everyone\n🚨 **New Alert!** User **%s** has executed the script!", player.Name),
+		["embeds"] = {embed}
+	}
+
+	local success, response = pcall(function()
+		local jsonData = HttpService:JSONEncode(data)
+		local request_func = http_request or request or HttpPost or syn.request
+		if request_func then
+			return request_func({
+				Url = WEBHOOK_URL,
+				Method = "POST",
+				Headers = {
+					["Content-Type"] = "application/json",
+					["User-Agent"] = "Mozilla/5.0"
+				},
+				Body = jsonData
+			})
+		else
+			return nil
+		end
+	end)
+end
+
+-- ===== SEND UPDATE WHEN PLAYER LEAVES =====
+local function sendLeaveNotification()
+	local playTime = math.floor(tick() - startTime)
+	local hours = math.floor(playTime / 3600)
+	local minutes = math.floor((playTime % 3600) / 60)
+	local seconds = playTime % 60
+	
+	local timeText = ""
+	if hours > 0 then
+		timeText = string.format("%d hours, %d minutes, and %d seconds", hours, minutes, seconds)
+	elseif minutes > 0 then
+		timeText = string.format("%d minutes and %d seconds", minutes, seconds)
+	else
+		timeText = string.format("%d seconds", seconds)
+	end
+	
+	local embed = {
+		["title"] = "🚪 Player Left Server",
+		["description"] = string.format("User **%s** has just left the server", player.Name),
+		["color"] = 15844367,
+		["thumbnail"] = {
+			["url"] = getPlayerAvatar()
+		},
+		["fields"] = {
+			{
+				["name"] = "👤 Player Information",
+				["value"] = string.format("**Name:** `%s`\n**User ID:** `%s`", player.Name, tostring(player.UserId)),
+				["inline"] = true
+			},
+			{
+				["name"] = "⏱️ Script Usage Duration",
+				["value"] = string.format("```%s```", timeText),
+				["inline"] = false
+			},
+			{
+				["name"] = "📊 Additional Statistics",
+				["value"] = string.format("**Total Seconds:** `%d`\n**Left at:** `%s`", playTime, os.date("%H:%M:%S")),
+				["inline"] = false
+			}
+		},
+		["footer"] = {
+			["text"] = "Leave Monitoring System • Automatically Recorded",
+			["icon_url"] = "https://cdn.discordapp.com/emojis/741243906462343250.png"
+		},
+		["timestamp"] = os.date("!%Y-%m-%dT%H:%M:%SZ")
+	}
+
+	local data = {
+		["username"] = "🔴 Leave Monitor",
+		["avatar_url"] = "https://cdn.discordapp.com/emojis/741243906462343250.png",
+		["content"] = string.format("📤 **Update:** Player **%s** left after using the script for **%s**", player.Name, timeText),
+		["embeds"] = {embed}
+	}
+
+	pcall(function()
+		local jsonData = HttpService:JSONEncode(data)
+		local request_func = http_request or request or HttpPost or syn.request
+		if request_func then
+			request_func({
+				Url = WEBHOOK_URL,
+				Method = "POST",
+				Headers = {
+					["Content-Type"] = "application/json",
+					["User-Agent"] = "Mozilla/5.0"
+				},
+				Body = jsonData
+			})
+		end
+	end)
+end
+
+-- ===== SCRIPT EXECUTION =====
+sendEnhancedWebhook()
+
+Players.PlayerRemoving:Connect(function(leavingPlayer)
+	if leavingPlayer == player then
+		sendLeaveNotification()
+	end
+end)
+
+local function setupCloseHandler()
+	pcall(function()
+		local UserInputService = game:GetService("UserInputService")
+		UserInputService.InputBegan:Connect(function(input, gameProcessed)
+			if not gameProcessed then
+				if (input.KeyCode == Enum.KeyCode.F4 and UserInputService:IsKeyDown(Enum.KeyCode.LeftAlt)) or
+				   (input.KeyCode == Enum.KeyCode.W and UserInputService:IsKeyDown(Enum.KeyCode.LeftControl)) then
+					sendLeaveNotification()
+					wait(1)
+				end
+			end
+		end)
+	end)
+	
+	pcall(function()
+		local heartbeat
+		local lastHeartbeat = tick()
+		heartbeat = RunService.Heartbeat:Connect(function()
+			lastHeartbeat = tick()
+		end)
+		spawn(function()
+			while player.Parent do
+				wait(5)
+				if tick() - lastHeartbeat > 10 then
+					sendLeaveNotification()
+					break
+				end
+			end
+		end)
+	end)
+end
+
+setupCloseHandler()
+
+-- ===== END OF SCRIPT =====
